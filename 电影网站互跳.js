@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         豆瓣电影快捷搜索跳转
 // @namespace    http://tampermonkey.net/
-// @version      1.4
-// @description  在豆瓣电影页面的“在哪儿看这部电影”下方添加一个“楚门的世界”链接，点击跳转到指定搜索网站；若页面没有该版块则自动创建，放到 .ticket 上方并保持同宽
+// @version      1.6
+// @description  在豆瓣电影页面的“在哪儿看这部电影”下方添加“楚门的世界”和“4k影视”链接；若页面没有该版块则自动创建，放到 #subject-doulist 上方
 // @author       You
 // @match        https://movie.douban.com/subject/*
 // @grant        none
@@ -22,13 +22,14 @@
         console.log('电影名称:', movieName);
 
         // 2. 构造搜索链接
-        var searchUrl = 'https://www.xn--rhqp87dfoiv9a830g.com/search?q=' + encodeURIComponent(movieName) + '&type=&mode=1';
+        var searchUrl1 = 'https://www.xn--rhqp87dfoiv9a830g.com/search?q=' + encodeURIComponent(movieName) + '&type=&mode=1';
+        var searchUrl2 = 'https://www.4kvm.me/search?q=' + encodeURIComponent(movieName);
 
         // 3. 定位“在哪儿看这部电影”区域
         var buyInfoContainer = document.querySelector('#buyinfo') || document.querySelector('.gray_ad');
 
         if (buyInfoContainer) {
-            // ========== 原有逻辑：页面已有该区域，完全按你原来的代码处理 ==========
+            // ========== 页面已有该区域：复用原样式，添加两个链接 ==========
             var firstList = buyInfoContainer.querySelector('ul.bs') || buyInfoContainer.querySelector('ul');
             if (!firstList) {
                 console.log('未找到播放源列表');
@@ -41,33 +42,40 @@
                 return;
             }
 
-            var newLi = document.createElement('li');
-            newLi.className = sampleItem.className;
-
-            var newLink = document.createElement('a');
-            newLink.href = searchUrl;
-            newLink.target = '_blank';
-            newLink.textContent = '楚门的世界';
-
             var sampleLink = sampleItem.querySelector('a');
-            if (sampleLink) {
-                newLink.className = sampleLink.className;
-            } else {
-                newLink.className = 'playBtn';
-            }
+            var linkClass = sampleLink ? sampleLink.className : 'playBtn';
 
-            newLi.appendChild(newLink);
-            firstList.insertBefore(newLi, firstList.firstChild);
-            console.log('“楚门的世界”链接已添加');
+            // 添加第二个链接（4k影视）
+            var newLi2 = document.createElement('li');
+            newLi2.className = sampleItem.className;
+            var newLink2 = document.createElement('a');
+            newLink2.href = searchUrl2;
+            newLink2.target = '_blank';
+            newLink2.textContent = '4k影视';
+            newLink2.className = linkClass;
+            newLi2.appendChild(newLink2);
+            firstList.insertBefore(newLi2, firstList.firstChild);
+
+            // 添加第一个链接（楚门的世界），确保它在最前面
+            var newLi1 = document.createElement('li');
+            newLi1.className = sampleItem.className;
+            var newLink1 = document.createElement('a');
+            newLink1.href = searchUrl1;
+            newLink1.target = '_blank';
+            newLink1.textContent = '楚门的世界';
+            newLink1.className = linkClass;
+            newLi1.appendChild(newLink1);
+            firstList.insertBefore(newLi1, firstList.firstChild);
+
+            console.log('两个链接已添加到现有版块');
 
         } else {
-            // ========== 没有该区域：搬到 .ticket 上方，宽度对齐 ==========
+            // ========== 没有该区域：搬到 #subject-doulist 上方 ==========
             console.log('未找到“在哪儿看这部电影”区域，创建新版块');
 
-            // 找到 .ticket 元素
-            var ticketEl = document.querySelector('.ticket');
-            if (!ticketEl) {
-                console.log('未找到 .ticket 元素，放弃创建');
+            var targetEl = document.querySelector('#subject-doulist');
+            if (!targetEl) {
+                console.log('未找到 #subject-doulist 元素，放弃创建');
                 return;
             }
 
@@ -85,36 +93,44 @@
             var ul = document.createElement('ul');
             ul.className = 'bs';
 
-            // 列表项
-            var li = document.createElement('li');
-            var a = document.createElement('a');
-            a.href = searchUrl;
-            a.target = '_blank';
-            a.textContent = '楚门的世界';
-            a.className = 'playBtn';
+            // 第一个链接：楚门的世界
+            var li1 = document.createElement('li');
+            var a1 = document.createElement('a');
+            a1.href = searchUrl1;
+            a1.target = '_blank';
+            a1.textContent = '楚门的世界';
+            a1.className = 'playBtn';
+            li1.appendChild(a1);
+            ul.appendChild(li1);
 
-            li.appendChild(a);
-            ul.appendChild(li);
+            // 第二个链接：4k影视
+            var li2 = document.createElement('li');
+            var a2 = document.createElement('a');
+            a2.href = searchUrl2;
+            a2.target = '_blank';
+            a2.textContent = '4k影视';
+            a2.className = 'playBtn';
+            li2.appendChild(a2);
+            ul.appendChild(li2);
+
             section.appendChild(ul);
 
-            // 插入到 .ticket 上方（同级、紧邻前面）
-            ticketEl.parentNode.insertBefore(section, ticketEl);
+            // 插入到 #subject-doulist 上方（同级、紧邻前面）
+            targetEl.parentNode.insertBefore(section, targetEl);
 
-            // 宽度和 .ticket 保持一致
-            // 用 requestAnimationFrame 等布局稳定后再量，保证拿到准确宽度
+            // 宽度和 #subject-doulist 保持一致
             requestAnimationFrame(function() {
-                var rect = ticketEl.getBoundingClientRect();
+                var rect = targetEl.getBoundingClientRect();
                 if (rect.width > 0) {
                     section.style.width = rect.width + 'px';
                 } else {
-                    // 拿不到实际像素时退回 CSS 方式
-                    var computed = window.getComputedStyle(ticketEl);
+                    var computed = window.getComputedStyle(targetEl);
                     section.style.width = computed.width;
                 }
-                console.log('.ticket 宽度:', section.style.width);
+                console.log('#subject-doulist 宽度:', section.style.width);
             });
 
-            console.log('已创建新版块，插入到 .ticket 上方');
+            console.log('已创建新版块，插入到 #subject-doulist 上方');
         }
     });
 })();
