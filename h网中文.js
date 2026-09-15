@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name         跳转到中文（优化版）
+// @name         跳转到中文（优化版2）
 // @namespace    http://tampermonkey.net/
 // @version      3.3
 // @description  修复308重定向及重复请求问题，增加防抖和请求取消
