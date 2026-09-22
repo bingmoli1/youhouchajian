@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         豆瓣电影快捷搜索跳转
 // @namespace    http://tampermonkey.net/
-// @version      1.8
-// @description  在豆瓣电影页面的“在哪儿看这部电影”下方添加“楚门的世界”和“bt之家”链接；若页面没有该版块则自动创建，放到 #subject-doulist 上方
+// @version      1.9
+// @description  在豆瓣电影页面的“在哪儿看这部电影”下方添加“楚门的世界”、“bt之家”和“SeedHub”链接；若页面没有该版块则自动创建，放到 #subject-doulist 上方
 // @author       You
 // @match        https://movie.douban.com/subject/*
 // @grant        none
@@ -27,12 +27,20 @@
         // 2. 构造搜索链接
         var searchUrl1 = 'https://www.xn--rhqp87dfoiv9a830g.com/search?q=' + encodeURIComponent(movieName) + '&type=&mode=1';
         var searchUrl2 = 'https://www.1lou.me/search/?q=' + encodeURIComponent(movieName);
+        var searchUrl3 = 'https://www.seedhub.cc/s/' + encodeURIComponent(movieName) + '/';
+
+        // 定义要添加的链接数据
+        var linksToAdd = [
+            { text: '楚门的世界', url: searchUrl1 },
+            { text: 'bt之家', url: searchUrl2 },
+            { text: 'SeedHub', url: searchUrl3 }
+        ];
 
         // 3. 定位“在哪儿看这部电影”区域
         var buyInfoContainer = document.querySelector('#buyinfo') || document.querySelector('.gray_ad');
 
         if (buyInfoContainer) {
-            // ========== 页面已有该区域：复用原样式，添加两个链接 ==========
+            // ========== 页面已有该区域：复用原样式，添加链接 ==========
             var firstList = buyInfoContainer.querySelector('ul.bs') || buyInfoContainer.querySelector('ul');
             if (!firstList) {
                 console.log('未找到播放源列表');
@@ -48,29 +56,21 @@
             var sampleLink = sampleItem.querySelector('a');
             var linkClass = sampleLink ? sampleLink.className : 'playBtn';
 
-            // 添加第一个链接（楚门的世界）
-            var newLi1 = document.createElement('li');
-            newLi1.className = sampleItem.className;
-            var newLink1 = document.createElement('a');
-            newLink1.href = searchUrl1;
-            newLink1.target = '_blank';
-            newLink1.textContent = '楚门的世界';
-            newLink1.className = linkClass;
-            newLi1.appendChild(newLink1);
-            firstList.insertBefore(newLi1, firstList.firstChild);
+            // 逐个插入到列表最前面（倒序插入以保持显示顺序）
+            for (var i = linksToAdd.length - 1; i >= 0; i--) {
+                var item = linksToAdd[i];
+                var newLi = document.createElement('li');
+                newLi.className = sampleItem.className;
+                var newLink = document.createElement('a');
+                newLink.href = item.url;
+                newLink.target = '_blank';
+                newLink.textContent = item.text;
+                newLink.className = linkClass;
+                newLi.appendChild(newLink);
+                firstList.insertBefore(newLi, firstList.firstChild);
+            }
 
-            // 添加第二个链接（bt之家）
-            var newLi2 = document.createElement('li');
-            newLi2.className = sampleItem.className;
-            var newLink2 = document.createElement('a');
-            newLink2.href = searchUrl2;
-            newLink2.target = '_blank';
-            newLink2.textContent = 'bt之家';
-            newLink2.className = linkClass;
-            newLi2.appendChild(newLink2);
-            firstList.insertBefore(newLi2, newLi1.nextSibling);
-
-            console.log('两个链接已添加到现有版块');
+            console.log('链接已添加到现有版块');
 
         } else {
             // ========== 没有该区域：搬到 #subject-doulist 上方 ==========
@@ -96,25 +96,17 @@
             var ul = document.createElement('ul');
             ul.className = 'bs';
 
-            // 第一个链接：楚门的世界
-            var li1 = document.createElement('li');
-            var a1 = document.createElement('a');
-            a1.href = searchUrl1;
-            a1.target = '_blank';
-            a1.textContent = '楚门的世界';
-            a1.className = 'playBtn';
-            li1.appendChild(a1);
-            ul.appendChild(li1);
-
-            // 第二个链接：bt之家
-            var li2 = document.createElement('li');
-            var a2 = document.createElement('a');
-            a2.href = searchUrl2;
-            a2.target = '_blank';
-            a2.textContent = 'bt之家';
-            a2.className = 'playBtn';
-            li2.appendChild(a2);
-            ul.appendChild(li2);
+            // 添加所有链接
+            linksToAdd.forEach(function(item) {
+                var li = document.createElement('li');
+                var a = document.createElement('a');
+                a.href = item.url;
+                a.target = '_blank';
+                a.textContent = item.text;
+                a.className = 'playBtn';
+                li.appendChild(a);
+                ul.appendChild(li);
+            });
 
             section.appendChild(ul);
 
