@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         豆瓣电影快捷搜索跳转
 // @namespace    http://tampermonkey.net/
-// @version      1.6
-// @description  在豆瓣电影页面的“在哪儿看这部电影”下方添加“楚门的世界”和“4k影视”链接；若页面没有该版块则自动创建，放到 #subject-doulist 上方
+// @version      1.8
+// @description  在豆瓣电影页面的“在哪儿看这部电影”下方添加“楚门的世界”和“bt之家”链接；若页面没有该版块则自动创建，放到 #subject-doulist 上方
 // @author       You
 // @match        https://movie.douban.com/subject/*
 // @grant        none
@@ -18,12 +18,15 @@
             console.log('未找到电影标题元素');
             return;
         }
-        var movieName = titleElement.textContent.trim();
+        var rawTitle = titleElement.textContent.trim();
+        // 只取第一个：先按 / 拆分，再按空格拆分，取第一段
+        var movieName = rawTitle.split('/')[0].trim().split(/\s+/)[0].trim();
+        console.log('原始标题:', rawTitle);
         console.log('电影名称:', movieName);
 
         // 2. 构造搜索链接
         var searchUrl1 = 'https://www.xn--rhqp87dfoiv9a830g.com/search?q=' + encodeURIComponent(movieName) + '&type=&mode=1';
-        var searchUrl2 = 'https://www.4kvm.me/search?q=' + encodeURIComponent(movieName);
+        var searchUrl2 = 'https://www.1lou.me/search/?q=' + encodeURIComponent(movieName);
 
         // 3. 定位“在哪儿看这部电影”区域
         var buyInfoContainer = document.querySelector('#buyinfo') || document.querySelector('.gray_ad');
@@ -45,18 +48,7 @@
             var sampleLink = sampleItem.querySelector('a');
             var linkClass = sampleLink ? sampleLink.className : 'playBtn';
 
-            // 添加第二个链接（4k影视）
-            var newLi2 = document.createElement('li');
-            newLi2.className = sampleItem.className;
-            var newLink2 = document.createElement('a');
-            newLink2.href = searchUrl2;
-            newLink2.target = '_blank';
-            newLink2.textContent = '4k影视';
-            newLink2.className = linkClass;
-            newLi2.appendChild(newLink2);
-            firstList.insertBefore(newLi2, firstList.firstChild);
-
-            // 添加第一个链接（楚门的世界），确保它在最前面
+            // 添加第一个链接（楚门的世界）
             var newLi1 = document.createElement('li');
             newLi1.className = sampleItem.className;
             var newLink1 = document.createElement('a');
@@ -66,6 +58,17 @@
             newLink1.className = linkClass;
             newLi1.appendChild(newLink1);
             firstList.insertBefore(newLi1, firstList.firstChild);
+
+            // 添加第二个链接（bt之家）
+            var newLi2 = document.createElement('li');
+            newLi2.className = sampleItem.className;
+            var newLink2 = document.createElement('a');
+            newLink2.href = searchUrl2;
+            newLink2.target = '_blank';
+            newLink2.textContent = 'bt之家';
+            newLink2.className = linkClass;
+            newLi2.appendChild(newLink2);
+            firstList.insertBefore(newLi2, newLi1.nextSibling);
 
             console.log('两个链接已添加到现有版块');
 
@@ -103,12 +106,12 @@
             li1.appendChild(a1);
             ul.appendChild(li1);
 
-            // 第二个链接：4k影视
+            // 第二个链接：bt之家
             var li2 = document.createElement('li');
             var a2 = document.createElement('a');
             a2.href = searchUrl2;
             a2.target = '_blank';
-            a2.textContent = '4k影视';
+            a2.textContent = 'bt之家';
             a2.className = 'playBtn';
             li2.appendChild(a2);
             ul.appendChild(li2);
