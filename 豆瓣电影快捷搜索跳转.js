@@ -28,12 +28,14 @@
         var searchUrl1 = 'https://www.xn--rhqp87dfoiv9a830g.com/search?q=' + encodeURIComponent(movieName) + '&type=&mode=1';
         var searchUrl2 = 'https://www.1lou.me/search/?q=' + encodeURIComponent(movieName);
         var searchUrl3 = 'https://www.seedhub.cc/s/' + encodeURIComponent(movieName) + '/';
+        var searchUrl4 = 'https://ddys.io/search?q=' + encodeURIComponent(movieName);
 
         // 定义要添加的链接数据
         var linksToAdd = [
             { text: '楚门的世界', url: searchUrl1 },
             { text: 'bt之家', url: searchUrl2 },
-            { text: 'SeedHub', url: searchUrl3 }
+            { text: 'SeedHub', url: searchUrl3 },
+            { text: '低端影视', url: searchUrl4 }
         ];
 
         // 3. 定位“在哪儿看这部电影”区域
