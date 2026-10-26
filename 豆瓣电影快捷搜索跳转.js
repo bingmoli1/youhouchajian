@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         豆瓣电影快捷搜索跳转
 // @namespace    http://tampermonkey.net/
-// @version      1.9
-// @description  在豆瓣电影页面的“在哪儿看这部电影”下方添加“楚门的世界”、“bt之家”和“SeedHub”链接；若页面没有该版块则自动创建，放到 #subject-doulist 上方
+// @version      2.0
+// @description  在豆瓣电影页面的“在哪儿看这部电影”下方添加“楚门的世界”、“bt之家”、“SeedHub”、“低端影视”和“比特大雄”链接；若页面没有该版块则自动创建，放到 #subject-doulist 上方
 // @author       You
 // @match        https://movie.douban.com/subject/*
 // @grant        none
@@ -29,13 +29,15 @@
         var searchUrl2 = 'https://www.1lou.me/search/?q=' + encodeURIComponent(movieName);
         var searchUrl3 = 'https://www.seedhub.cc/s/' + encodeURIComponent(movieName) + '/';
         var searchUrl4 = 'https://ddys.io/search?q=' + encodeURIComponent(movieName);
+        var searchUrl5 = 'https://www.btdx8.net/?s=' + encodeURIComponent(movieName);
 
         // 定义要添加的链接数据
         var linksToAdd = [
             { text: '楚门的世界', url: searchUrl1 },
             { text: 'bt之家', url: searchUrl2 },
             { text: 'SeedHub', url: searchUrl3 },
-            { text: '低端影视', url: searchUrl4 }
+            { text: '低端影视', url: searchUrl4 },
+            { text: '比特大雄', url: searchUrl5 }
         ];
 
         // 3. 定位“在哪儿看这部电影”区域
