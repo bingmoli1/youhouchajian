@@ -1,135 +1,151 @@
 // ==UserScript==
 // @name         豆瓣电影快捷搜索跳转
 // @namespace    http://tampermonkey.net/
-// @version      2.0
+// @version      2.1
 // @description  在豆瓣电影页面的“在哪儿看这部电影”下方添加“楚门的世界”、“bt之家”、“SeedHub”、“低端影视”和“比特大雄”链接；若页面没有该版块则自动创建，放到 #subject-doulist 上方
 // @author       You
 // @match        https://movie.douban.com/subject/*
 // @grant        none
 // ==/UserScript==
 
-(function() {
+(function () {
     'use strict';
 
-    window.addEventListener('load', function() {
-        // 1. 获取电影名称
-        var titleElement = document.querySelector('h1 span[property="v:itemreviewed"]');
-        if (!titleElement) {
-            console.log('未找到电影标题元素');
+    const LOG_PREFIX = '[豆瓣跳转]';
+    const LINK_MARK = 'data-tm-link';
+    const MAX_TITLE_RETRY = 10;
+    const log = (...args) => console.log(LOG_PREFIX, ...args);
+
+    // 搜索站配置：新增站点只需在这里加一行
+    const SEARCH_SITES = [
+        { text: '楚门的世界', url: name => `https://www.xn--rhqp87dfoiv9a830g.com/search?q=${encodeURIComponent(name)}&type=&mode=1` },
+        { text: 'bt之家',     url: name => `https://www.1lou.me/search/?q=${encodeURIComponent(name)}` },
+        { text: 'SeedHub',    url: name => `https://www.seedhub.cc/s/${encodeURIComponent(name)}/` },
+        { text: '低端影视',   url: name => `https://ddys.io/search?q=${encodeURIComponent(name)}` },
+        { text: '比特大雄',   url: name => `https://www.btdx8.net/?s=${encodeURIComponent(name)}` },
+    ];
+
+    const HAS_CJK = /[\u4e00-\u9fa5]/;
+    const HAS_FOREIGN = /[\u3040-\u30ff\uac00-\ud7af\u0400-\u04ffA-Za-z]/;
+
+    // 优先取片名的中文部分：「肖申克的救赎 The Shawshank Redemption」→「肖申克的救赎」；
+    // 纯外文片名（如 The Matrix）保留整段，避免被截成一个单词。
+    function extractMovieName(rawTitle) {
+        const first = rawTitle.split('/')[0].trim();
+        if (!HAS_CJK.test(first)) return first;
+
+        const chinese = [];
+        for (const part of first.split(/\s+/)) {
+            // 碰到日文假名、韩文、西里尔或拉丁字母的段落就停
+            if (HAS_FOREIGN.test(part) || !HAS_CJK.test(part)) break;
+            chinese.push(part);
+        }
+        return chinese.join(' ') || first;
+    }
+
+    function createAnchor(site, movieName, className) {
+        const a = document.createElement('a');
+        a.href = site.url(movieName);
+        a.target = '_blank';
+        a.rel = 'noopener noreferrer';
+        a.textContent = site.text;
+        a.className = className;
+        return a;
+    }
+
+    function createItem(site, movieName, template) {
+        const li = document.createElement('li');
+        li.setAttribute(LINK_MARK, '1');
+        if (template) li.className = template.className;
+        li.appendChild(createAnchor(site, movieName, template?.linkClass || 'playBtn'));
+        return li;
+    }
+
+    // 已有版块：复用原样式，一次性插入到列表最前面
+    function insertIntoExistingList(list, sampleItem, sampleLink, movieName) {
+        const template = {
+            className: sampleItem.className,
+            linkClass: sampleLink ? sampleLink.className : 'playBtn',
+        };
+        const frag = document.createDocumentFragment();
+        for (const site of SEARCH_SITES) {
+            frag.appendChild(createItem(site, movieName, template));
+        }
+        list.insertBefore(frag, list.firstChild);
+        log('链接已添加到现有版块');
+    }
+
+    // 没有可用版块：自建一个，放到 #subject-doulist 上方
+    function createSection(movieName) {
+        const target = document.querySelector('#subject-doulist');
+        if (!target) {
+            log('未找到 #subject-doulist，放弃创建');
             return;
         }
-        var rawTitle = titleElement.textContent.trim();
-        // 只取第一个：先按 / 拆分，再按空格拆分，取第一段
-        var movieName = rawTitle.split('/')[0].trim().split(/\s+/)[0].trim();
-        console.log('原始标题:', rawTitle);
-        console.log('电影名称:', movieName);
 
-        // 2. 构造搜索链接
-        var searchUrl1 = 'https://www.xn--rhqp87dfoiv9a830g.com/search?q=' + encodeURIComponent(movieName) + '&type=&mode=1';
-        var searchUrl2 = 'https://www.1lou.me/search/?q=' + encodeURIComponent(movieName);
-        var searchUrl3 = 'https://www.seedhub.cc/s/' + encodeURIComponent(movieName) + '/';
-        var searchUrl4 = 'https://ddys.io/search?q=' + encodeURIComponent(movieName);
-        var searchUrl5 = 'https://www.btdx8.net/?s=' + encodeURIComponent(movieName);
+        const section = document.createElement('div');
+        section.className = 'gray_ad';
+        // #buyinfo 已存在（但结构不可用）时不重复使用同名 id
+        section.id = document.getElementById('buyinfo') ? 'tm-buyinfo' : 'buyinfo';
 
-        // 定义要添加的链接数据
-        var linksToAdd = [
-            { text: '楚门的世界', url: searchUrl1 },
-            { text: 'bt之家', url: searchUrl2 },
-            { text: 'SeedHub', url: searchUrl3 },
-            { text: '低端影视', url: searchUrl4 },
-            { text: '比特大雄', url: searchUrl5 }
-        ];
+        const h2 = document.createElement('h2');
+        h2.textContent = '在哪儿看这部电影';
+        section.appendChild(h2);
 
-        // 3. 定位“在哪儿看这部电影”区域
-        var buyInfoContainer = document.querySelector('#buyinfo') || document.querySelector('.gray_ad');
-
-        if (buyInfoContainer) {
-            // ========== 页面已有该区域：复用原样式，添加链接 ==========
-            var firstList = buyInfoContainer.querySelector('ul.bs') || buyInfoContainer.querySelector('ul');
-            if (!firstList) {
-                console.log('未找到播放源列表');
-                return;
-            }
-
-            var sampleItem = firstList.querySelector('li');
-            if (!sampleItem) {
-                console.log('未找到示例列表项');
-                return;
-            }
-
-            var sampleLink = sampleItem.querySelector('a');
-            var linkClass = sampleLink ? sampleLink.className : 'playBtn';
-
-            // 逐个插入到列表最前面（倒序插入以保持显示顺序）
-            for (var i = linksToAdd.length - 1; i >= 0; i--) {
-                var item = linksToAdd[i];
-                var newLi = document.createElement('li');
-                newLi.className = sampleItem.className;
-                var newLink = document.createElement('a');
-                newLink.href = item.url;
-                newLink.target = '_blank';
-                newLink.textContent = item.text;
-                newLink.className = linkClass;
-                newLi.appendChild(newLink);
-                firstList.insertBefore(newLi, firstList.firstChild);
-            }
-
-            console.log('链接已添加到现有版块');
-
-        } else {
-            // ========== 没有该区域：搬到 #subject-doulist 上方 ==========
-            console.log('未找到“在哪儿看这部电影”区域，创建新版块');
-
-            var targetEl = document.querySelector('#subject-doulist');
-            if (!targetEl) {
-                console.log('未找到 #subject-doulist 元素，放弃创建');
-                return;
-            }
-
-            // 创建外层容器
-            var section = document.createElement('div');
-            section.id = 'buyinfo';
-            section.className = 'gray_ad';
-
-            // 标题
-            var h2 = document.createElement('h2');
-            h2.textContent = '在哪儿看这部电影';
-            section.appendChild(h2);
-
-            // 列表
-            var ul = document.createElement('ul');
-            ul.className = 'bs';
-
-            // 添加所有链接
-            linksToAdd.forEach(function(item) {
-                var li = document.createElement('li');
-                var a = document.createElement('a');
-                a.href = item.url;
-                a.target = '_blank';
-                a.textContent = item.text;
-                a.className = 'playBtn';
-                li.appendChild(a);
-                ul.appendChild(li);
-            });
-
-            section.appendChild(ul);
-
-            // 插入到 #subject-doulist 上方（同级、紧邻前面）
-            targetEl.parentNode.insertBefore(section, targetEl);
-
-            // 宽度和 #subject-doulist 保持一致
-            requestAnimationFrame(function() {
-                var rect = targetEl.getBoundingClientRect();
-                if (rect.width > 0) {
-                    section.style.width = rect.width + 'px';
-                } else {
-                    var computed = window.getComputedStyle(targetEl);
-                    section.style.width = computed.width;
-                }
-                console.log('#subject-doulist 宽度:', section.style.width);
-            });
-
-            console.log('已创建新版块，插入到 #subject-doulist 上方');
+        const ul = document.createElement('ul');
+        ul.className = 'bs';
+        for (const site of SEARCH_SITES) {
+            ul.appendChild(createItem(site, movieName, null));
         }
-    });
+        section.appendChild(ul);
+
+        target.parentNode.insertBefore(section, target);
+        log('已创建新版块，插入到 #subject-doulist 上方');
+
+        // 宽度和 #subject-doulist 保持一致
+        requestAnimationFrame(() => {
+            const rect = target.getBoundingClientRect();
+            section.style.width = rect.width > 0 ? `${rect.width}px` : getComputedStyle(target).width;
+        });
+    }
+
+    function init(attempt = 0) {
+        // 已经注入过就退出，避免脚本重复执行造成重复链接
+        if (document.querySelector(`li[${LINK_MARK}]`)) return;
+
+        const titleEl = document.querySelector('h1 span[property="v:itemreviewed"]');
+        if (!titleEl) {
+            if (attempt < MAX_TITLE_RETRY) {
+                setTimeout(() => init(attempt + 1), 300);
+            } else {
+                log('未找到电影标题元素');
+            }
+            return;
+        }
+
+        const movieName = extractMovieName(titleEl.textContent.trim());
+        if (!movieName) {
+            log('标题为空，跳过');
+            return;
+        }
+        log('电影名称:', movieName);
+
+        const container = document.querySelector('#buyinfo, .gray_ad');
+        const list = container?.querySelector('ul.bs, ul');
+        const sampleItem = list?.querySelector('li');
+
+        if (list && sampleItem) {
+            insertIntoExistingList(list, sampleItem, sampleItem.querySelector('a'), movieName);
+            return;
+        }
+
+        // 页面没有该版块，或版块结构不可用时，降级为自建
+        createSection(movieName);
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => init(), { once: true });
+    } else {
+        init();
+    }
 })();
